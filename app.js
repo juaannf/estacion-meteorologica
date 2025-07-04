@@ -1,41 +1,50 @@
-// Configuración mejorada del cliente MQTT
 const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
+const brokers = [
+    { host: "wss://test.mosquitto.org", port: 8081, ssl: true },
+    { host: "wss://broker.emqx.io", port: 8084, ssl: true }
+];
+
+let currentBroker = 0;
 const cliente = new Paho.MQTT.Client(
-    "test.mosquitto.org",
-    8081,
+    brokers[currentBroker].host,
+    brokers[currentBroker].port,
     clientId
 );
 
-// Función para actualizar el estado en la UI
 function updateStatus(message, color) {
     const statusElement = document.getElementById("estado");
-    if (statusElement) {
-        statusElement.textContent = message;
-        statusElement.style.color = color;
-    }
+    statusElement.textContent = message;
+    statusElement.style.color = color;
     console.log("Estado:", message);
 }
 
-// Opciones de conexión CORREGIDAS (sin 'reconnect')
+function tryNextBroker() {
+    currentBroker = (currentBroker + 1) % brokers.length;
+    console.log("Probando broker alternativo:", brokers[currentBroker].host);
+    updateStatus(`Probando conexión con ${brokers[currentBroker].host}...`, "blue");
+    
+    cliente.host = brokers[currentBroker].host;
+    cliente.port = brokers[currentBroker].port;
+    
+    setTimeout(() => cliente.connect(opciones), 1000);
+}
+
 const opciones = {
     onSuccess: function() {
-        console.log("Conectado al broker MQTT");
-        updateStatus("Conectado", "green");
-        
-        // Suscribirse a los topics
+        console.log("Conectado a", brokers[currentBroker].host);
+        updateStatus(`Conectado a ${brokers[currentBroker].host}`, "green");
         cliente.subscribe("estacion/datos");
         cliente.subscribe("estacion/alertas");
     },
     onFailure: function(message) {
         console.error("Error de conexión:", message.errorMessage);
         updateStatus("Error de conexión", "red");
-        setTimeout(() => cliente.connect(opciones), 5000);
+        tryNextBroker();
     },
-    useSSL: false,
+    useSSL: true,
     mqttVersion: 4
 };
 
-// Manejo de mensajes recibidos
 cliente.onMessageArrived = function(mensaje) {
     console.log("Mensaje recibido:", mensaje.destinationName, mensaje.payloadString);
     
@@ -53,18 +62,14 @@ cliente.onMessageArrived = function(mensaje) {
     }
 };
 
-// Manejo de pérdida de conexión
-cliente.onConnectionLost = function(responseObject) {
-    if (responseObject.errorCode !== 0) {
-        console.log("Conexión perdida:", responseObject.errorMessage);
-        updateStatus("Desconectado - Reconectando...", "orange");
-        setTimeout(() => cliente.connect(opciones), 5000);
-    }
+cliente.onConnectionLost = function(response) {
+    console.warn("Conexión perdida:", response.errorMessage);
+    updateStatus("Desconectado", "orange");
+    tryNextBroker();
 };
 
-// Iniciar conexión cuando el DOM esté listo
 document.addEventListener("DOMContentLoaded", function() {
-    console.log("Iniciando conexión MQTT...");
     updateStatus("Conectando...", "blue");
+    console.log("Iniciando conexión MQTT...");
     cliente.connect(opciones);
 });
