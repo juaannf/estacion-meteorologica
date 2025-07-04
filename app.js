@@ -1,4 +1,4 @@
-const cliente = new Paho.MQTT.Client("test.mosquitto.org",8080,"webclient");
+const cliente = new Paho.MQTT.Client("test.mosquitto.org",1883,"webclient");
 cliente.onMessageArrived=mensaje=>{
     const datos=JSON.parse(mensaje.payloadString);
     document.getElementById("temp").textContent=datos.temp;
