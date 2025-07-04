@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estación meteorológica</title>
-    <!-- Usar versión específica y estable de Paho -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+    <!-- Cargar Paho MQTT desde CDN alternativo -->
+    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -39,7 +39,7 @@
     <div>Estado: <span id="estado" class="desconectado">Desconectado</span></div>
     <div id="alerta">--</div>
 
-    <!-- Cargar app.js al final del body -->
-    <script src="app.js"></script>
+    <!-- Cargar app.js con parámetro de versión para evitar caché -->
+    <script src="app.js?v=1.0.1"></script>
 </body>
 </html>
