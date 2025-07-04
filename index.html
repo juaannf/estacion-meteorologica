@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estación meteorológica</title>
+    <!-- Usar versión específica y estable de Paho -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
-    <script src="app.js" defer></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -24,6 +24,9 @@
             border-radius: 5px;
             margin-top: 20px;
         }
+        .conectado { color: green; }
+        .desconectado { color: red; }
+        .conectando { color: blue; }
     </style>
 </head>
 <body>
@@ -33,17 +36,10 @@
     <div class="dato">Humedad: <span id="hum">--</span> %</div> 
     <div class="dato">Luz: <span id="luz">--</span> %</div>
     
-    <div>Estado: <span id="estado">Desconectado</span></div>
+    <div>Estado: <span id="estado" class="desconectado">Desconectado</span></div>
     <div id="alerta">--</div>
 
-    <script>
-        // Mostrar mensaje si JavaScript no está cargando
-        window.addEventListener('load', function() {
-            if (typeof Paho === 'undefined') {
-                document.getElementById('estado').textContent = "Error: No se cargó la biblioteca MQTT";
-                document.getElementById('estado').style.color = "red";
-            }
-        });
-    </script>
+    <!-- Cargar app.js al final del body -->
+    <script src="app.js"></script>
 </body>
 </html>

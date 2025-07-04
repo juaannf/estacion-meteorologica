@@ -1,75 +1,131 @@
-const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
-const brokers = [
-    { host: "wss://test.mosquitto.org", port: 8081, ssl: true },
-    { host: "wss://broker.emqx.io", port: 8084, ssl: true }
-];
-
-let currentBroker = 0;
-const cliente = new Paho.MQTT.Client(
-    brokers[currentBroker].host,
-    brokers[currentBroker].port,
-    clientId
-);
-
-function updateStatus(message, color) {
-    const statusElement = document.getElementById("estado");
-    statusElement.textContent = message;
-    statusElement.style.color = color;
-    console.log("Estado:", message);
-}
-
-function tryNextBroker() {
-    currentBroker = (currentBroker + 1) % brokers.length;
-    console.log("Probando broker alternativo:", brokers[currentBroker].host);
-    updateStatus(`Probando conexión con ${brokers[currentBroker].host}...`, "blue");
-    
-    cliente.host = brokers[currentBroker].host;
-    cliente.port = brokers[currentBroker].port;
-    
-    setTimeout(() => cliente.connect(opciones), 1000);
-}
-
-const opciones = {
-    onSuccess: function() {
-        console.log("Conectado a", brokers[currentBroker].host);
-        updateStatus(`Conectado a ${brokers[currentBroker].host}`, "green");
-        cliente.subscribe("estacion/datos");
-        cliente.subscribe("estacion/alertas");
-    },
-    onFailure: function(message) {
-        console.error("Error de conexión:", message.errorMessage);
-        updateStatus("Error de conexión", "red");
-        tryNextBroker();
-    },
-    useSSL: true,
-    mqttVersion: 4
-};
-
-cliente.onMessageArrived = function(mensaje) {
-    console.log("Mensaje recibido:", mensaje.destinationName, mensaje.payloadString);
-    
-    try {
-        const datos = JSON.parse(mensaje.payloadString);
-        if (mensaje.destinationName === "estacion/datos") {
-            document.getElementById("temp").textContent = datos.temp?.toFixed(1) || "--";
-            document.getElementById("hum").textContent = datos.hum?.toFixed(1) || "--";
-            document.getElementById("luz").textContent = datos.luz?.toFixed(1) || "--";
-        } else if (mensaje.destinationName === "estacion/alertas") {
-            document.getElementById("alerta").textContent = datos.alerta || "--";
-        }
-    } catch (e) {
-        console.error("Error procesando mensaje:", e);
-    }
-};
-
-cliente.onConnectionLost = function(response) {
-    console.warn("Conexión perdida:", response.errorMessage);
-    updateStatus("Desconectado", "orange");
-    tryNextBroker();
-};
-
+// Esperar a que todo el DOM esté completamente cargado
 document.addEventListener("DOMContentLoaded", function() {
-    updateStatus("Conectando...", "blue");
-    console.log("Iniciando conexión MQTT...");
-    cliente.connect(opciones);
+    console.log("DOM completamente cargado");
+    
+    // Configuración MQTT mejorada
+    const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
+    const brokers = [
+        { 
+            name: "Mosquitto SSL", 
+            host: "test.mosquitto.org", 
+            port: 8080,  // Puerto SSL correcto
+            protocol: "wss",
+            path: "/"
+        },
+        { 
+            name: "EMQX SSL", 
+            host: "broker.emqx.io", 
+            port: 8084, 
+            protocol: "wss",
+            path: "/mqtt"
+        }
+    ];
+
+    let currentBroker = 0;
+    let cliente = null;
+
+    // Función para actualizar estado con manejo seguro de elementos
+    function updateStatus(message, isError = false) {
+        const statusElement = document.getElementById("estado");
+        if (!statusElement) {
+            console.error("Elemento 'estado' no encontrado");
+            return;
+        }
+        
+        statusElement.textContent = message;
+        statusElement.className = isError ? "desconectado" : 
+                                message.includes("Conectado") ? "conectado" : "conectando";
+        
+        console.log("Estado:", message);
+    }
+
+    // Función para conectar al broker
+    function connectToBroker() {
+        const broker = brokers[currentBroker];
+        console.log(`Intentando conectar a: ${broker.name} (${broker.host}:${broker.port})`);
+        
+        updateStatus(`Conectando a ${broker.name}...`);
+
+        // Crear nuevo cliente (importante para reconexiones)
+        cliente = new Paho.MQTT.Client(
+            broker.host,
+            Number(broker.port),
+            broker.path,
+            clientId
+        );
+
+        // Configurar manejadores de eventos
+        cliente.onConnectionLost = onConnectionLost;
+        cliente.onMessageArrived = onMessageArrived;
+
+        // Opciones de conexión
+        const options = {
+            timeout: 10,
+            useSSL: true,
+            mqttVersion: 4,
+            onSuccess: onConnectSuccess,
+            onFailure: onConnectFailure,
+            reconnect: false
+        };
+
+        cliente.connect(options);
+    }
+
+    // Manejador de conexión exitosa
+    function onConnectSuccess() {
+        console.log("Conexión MQTT establecida");
+        updateStatus(`Conectado a ${brokers[currentBroker].name}`);
+        
+        // Suscribirse a los topics
+        cliente.subscribe("estacion/datos", {qos: 0});
+        cliente.subscribe("estacion/alertas", {qos: 0});
+    }
+
+    // Manejador de fallo de conexión
+    function onConnectFailure(error) {
+        console.error("Error de conexión:", error.errorMessage);
+        updateStatus(`Error: ${error.errorMessage}`, true);
+        
+        // Intentar con el siguiente broker
+        currentBroker = (currentBroker + 1) % brokers.length;
+        setTimeout(connectToBroker, 3000);
+    }
+
+    // Manejador de conexión perdida
+    function onConnectionLost(response) {
+        if (response.errorCode !== 0) {
+            console.warn("Conexión perdida:", response.errorMessage);
+            updateStatus("Desconectado", true);
+            setTimeout(connectToBroker, 3000);
+        }
+    }
+
+    // Manejador de mensajes recibidos
+    function onMessageArrived(message) {
+        console.log("Mensaje recibido:", message.destinationName, message.payloadString);
+        
+        try {
+            const datos = JSON.parse(message.payloadString);
+            
+            // Actualizar UI de forma segura
+            const updateElement = (id, value) => {
+                const element = document.getElementById(id);
+                if (element) element.textContent = value;
+            };
+
+            if (message.destinationName === "estacion/datos") {
+                updateElement("temp", datos.temp?.toFixed(1) || "--");
+                updateElement("hum", datos.hum?.toFixed(1) || "--");
+                updateElement("luz", datos.luz?.toFixed(1) || "--");
+            } 
+            else if (message.destinationName === "estacion/alertas") {
+                updateElement("alerta", datos.alerta || "--");
+            }
+        } catch (e) {
+            console.error("Error procesando mensaje:", e);
+        }
+    }
+
+    // Iniciar la conexión
+    connectToBroker();
 });
