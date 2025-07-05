@@ -1,5 +1,5 @@
 
-const cliente=new Paho.MQTT.Client("wss://test.mosquitto.org:8081/mqtt", "webclient");
+const cliente=new Paho.MQTT.Client("wss://test.mosquitto.org:8081/mqtt", "webcliente");
 
 cliente.onMessageArrived=mensaje => {
     try {
@@ -12,7 +12,7 @@ cliente.onMessageArrived=mensaje => {
     if (datos.alerta!==undefined) {
         document.getElementById("alerta").textContent=datos.alerta;
     }
-}catch(e){}
+}catch(error){}
 };
 cliente.connect({
     useSSL: true,
