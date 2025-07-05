@@ -2,6 +2,7 @@
 const cliente=new Paho.MQTT.Client("wss://test.mosquitto.org:8081/mqtt", "webclient");
 
 cliente.onMessageArrived=mensaje => {
+    try {
     const datos=JSON.parse(mensaje.payloadString);
     if (datos.temp!==undefined) {
         document.getElementById("temp").textContent=datos.temp;
@@ -11,6 +12,7 @@ cliente.onMessageArrived=mensaje => {
     if (datos.alerta!==undefined) {
         document.getElementById("alerta").textContent=datos.alerta;
     }
+}catch(e){}
 };
 cliente.connect({
     useSSL: true,
